@@ -238,7 +238,7 @@ bool loadCameraCalibration(string name, Mat& cameraMatrix, Mat& distanceCoeffici
 
 
 void cameraCalibrationProcess(Mat& cameraMatrix, Mat& distanceCoefficients, Mat& frame){ //new
-
+     
     Mat drawToFrame;
 
 		
@@ -252,24 +252,39 @@ void cameraCalibrationProcess(Mat& cameraMatrix, Mat& distanceCoefficients, Mat&
 
     while(true){
 	
-  			ROS_INFO("While loop entered");
+  			ROS_INFO("While loop entered - CCP");
         vector<Vec2f> foundPoints;
         bool found = false;
 				ROS_INFO("start to find chessboard");
-        found = findChessboardCorners(frame, chessboardDimensions, foundPoints, CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_NORMALIZE_IMAGE);
-        ROS_INFO("cheesboard found");
+        if (frame.empty()){
+        ROS_INFO("MATRIX IS EMPTY!");
+        }else{
+            found = findChessboardCorners(frame, chessboardDimensions, foundPoints, CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_NORMALIZE_IMAGE);
+            ROS_INFO("findChessboardCorners");
+            ROS_INFO("found = %i", found);
+        }
+
+        //ROS_INFO("chessboard found");
         frame.copyTo(drawToFrame);
+        ROS_INFO("Frame Copied");
+        
         drawChessboardCorners(drawToFrame, chessboardDimensions, foundPoints, found);
-        if(found)
+        ROS_INFO("DRAW called");
+        if(found){
+            ROS_INFO("IF statement");
             imshow("Webcam", drawToFrame);
-        else
+    }else{
+            ROS_INFO("Else statment");
+            ROS_INFO("FRAME IS EMPTY %i", frame.empty());
             imshow("Webcam", frame);
+    }
         char character = waitKey(1000 / framesPerSecond); //capture typed chars
-
+        ROS_INFO("BEFOR SWTICH STATEMENT");
         switch(character){
-
+        
         case ' ':
             //SPACE - saving image
+            ROS_INFO("SPACBAR ----------------------------------------SPACEBAR----");
             if(found){
                 Mat temp;
                 frame.copyTo(temp);
@@ -279,7 +294,8 @@ void cameraCalibrationProcess(Mat& cameraMatrix, Mat& distanceCoefficients, Mat&
             break;
         case 10:
             //ENTER - start calibration
-            std::cout << "ENTER Pressed";
+            ROS_INFO( "ENTER Pressed ----------------------------- ENTER--");
+            
             if (savedImages.size() > 15){
 
                 std::cout << "Starting calibration..." << endl;
@@ -304,29 +320,6 @@ void cameraCalibrationProcess(Mat& cameraMatrix, Mat& distanceCoefficients, Mat&
   
   
   
-  void run(){
-  
-  	   ros::Rate loop_rate(10); // 10 Hz
-  	    //main code
-	      Mat cameraMatrix = Mat::eye(3,3, CV_64F); //identity matrix
-   			ROS_INFO("Mat 1 done");
-   			Mat distanceCoefficients;
-   			ROS_INFO("Mat 2 done");
-   			
-   			
-		//	cameraCalibrationProcess(cameraMatrix, distanceCoefficients, img);	
-	       
-
-  	    ros::spinOnce();
-       loop_rate.sleep();
-	       }
-    
-  /*  loadCameraCalibration("CalibrationNation", cameraMatrix, distanceCoefficients);
-    std::cout << "load calibration completed" << endl;
-    startWebcamMonitoring(cameraMatrix, distanceCoefficients, arucoSquareDimension);
-    std::cout << "webcam monitoring" << endl;*/
-  
-  
   
   
   
@@ -335,20 +328,19 @@ static const std::string OPENCV_WINDOW = "Image window";
 
 class ImageConverter
 {
-
 public:
+	static bool img_received_;
   ros::NodeHandle nh_;
   image_transport::ImageTransport it_;
   image_transport::Subscriber image_sub_;
   image_transport::Publisher image_pub_;
   //image_transport allows you to subscribe to compressed image streams
-  
+  	cv::Mat img;
 
-
-	cv::Mat img;
   ImageConverter()
-    : it_(nh_)
+    : it_(nh_)//, img_received_(false)
   {
+    cout << "instance created" << endl;
     // Subscrive to input video feed and publish output video feed
     image_sub_ = it_.subscribe("/ardrone/image_raw", 1, //subscirbed topic has been changed
       &ImageConverter::imageCb, this);
@@ -364,12 +356,26 @@ public:
 
   void imageCb(const sensor_msgs::ImageConstPtr& msg)
   {
+  
+  	std::cout << "Call back called " << endl;
   	//converts ROS image to CVImage type and makes a mutable(changeable) copy of image
     cv_bridge::CvImagePtr cv_ptr;
     try
     {
-      //cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
-       img = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::BGR8)->image;
+        //cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+        img = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::BGR8)->image;
+       
+        cout << "image sent" << endl;
+        img_received_ = true;
+        cout << "image is true" << endl;
+        int rows = img.rows;
+        int cols = img.cols;
+        ROS_INFO("A");
+        cv::Size s = img.size();
+        rows = s.height;
+        cols = s.width;
+        ROS_INFO("Mat Input Rows: %i", rows );
+        ROS_INFO("Mat Input Cols: %i", cols );
       
     }
     catch (cv_bridge::Exception& e)
@@ -380,36 +386,71 @@ public:
 
     // Draw an example circle on the video stream
     //if (img.rows > 60 && img.cols > 60)
-      cv::circle(img, cv::Point(100, 100), 100, CV_RGB(255,0,0));
+    
+     
 
-    // Update GUI Window
+   // Update GUI Window
+    if (img_received_){
+        cv::circle(img, cv::Point(100, 100), 100, CV_RGB(255,0,0));
+
     cv::imshow(OPENCV_WINDOW, img);
-    cv::waitKey(3);
+    ROS_INFO("imshow called ----------------------------------------CALLED");
+    cv::waitKey(3); //allows for compt to process
+    img_received_ = false;
+    }
+    
+ 
+
 
     // Output modified video stream
     //image_pub_.publish(cv_ptr->toImageMsg());
   }
+
+  
+ 
+  void run2(){
+
+  	   ros::Rate loop_rate(10); // 10 Hz
+
+        while (ros::ok()) { //how code shiuld be structured
+  	        //main code
+            ROS_INFO("run2 called ");
+	        Mat cameraMatrix = Mat::eye(3,3, CV_64F); //identity matrix
+   			ROS_INFO("Mat 1 done");
+   			Mat distanceCoefficients;
+   			ROS_INFO("Mat 2 done");
+   			ROS_INFO("---------------------------------img receieved ============= %i", img_received_ );
+   			  	  
+			cameraCalibrationProcess(cameraMatrix, distanceCoefficients, img);	
+	        ROS_INFO("Calibration has finished ===================================");
+            
+            
+            ros::spinOnce();
+            loop_rate.sleep();
+
+            
+    	}
+}    
+  /*  loadCameraCalibration("CalibrationNation", cameraMatrix, distanceCoefficients);
+    std::cout << "load calibration completed" << endl;
+    startWebcamMonitoring(cameraMatrix, distanceCoefficients, arucoSquareDimension);
+    std::cout << "webcam monitoring" << endl;*/
+  
+  
+
+  
 };
+bool ImageConverter::img_received_ = false;
+
 
 int main(int argc, char** argv)
 {
   ros::init(argc, argv, "detect");
   ImageConverter ic;
+  ic.run2();
   //run();
-  ros::Rate loop_rate(10); // 10 Hz
-  	    //main code
-	      Mat cameraMatrix = Mat::eye(3,3, CV_64F); //identity matrix
-   			ROS_INFO("Mat 1 done");
-   			Mat distanceCoefficients;
-   			ROS_INFO("Mat 2 done");
-   			
-   			
-		cameraCalibrationProcess(cameraMatrix, distanceCoefficients,  ic.img);	
-	       
-
-  	    ros::spinOnce();
-       loop_rate.sleep();
-  ros::spin();
+  
+  
   return 0;
 }
 
