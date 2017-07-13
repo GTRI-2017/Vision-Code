@@ -67,9 +67,9 @@ void getChesssboardCorners(vector<Mat> images, vector<vector<Point2f> >& allFoun
 
 
 
-int startWebcamMonitoring(const Mat& cameraMatrix, const Mat& distanceCoefficients, float arucoSquareDimension){
+int startWebcamMonitoring(const Mat& cameraMatrix, const Mat& distanceCoefficients, float arucoSquareDimension, Mat& frame){
 
-    Mat frame;
+    
 
     vector<int> markerIds;
     vector<vector<Point2f> > markerCorners, rejectedCandidates;
@@ -94,6 +94,9 @@ int startWebcamMonitoring(const Mat& cameraMatrix, const Mat& distanceCoefficien
         for(int i = 0;  i < markerIds.size(); i ++){
 
             aruco::drawAxis(frame, cameraMatrix, distanceCoefficients, rotationVectors[i], translationVectors[i], 0.1f);
+            cout << "---------------------Loop: " << i << "-----------" << endl;
+            cout << "Translation Vectors: " << translationVectors[i] << endl;
+            cout << "Rotation vectors: " <<  rotationVectors[i] << endl;
         }
 
         imshow("Webcam",  frame);
@@ -422,7 +425,7 @@ public:
 			   // cameraCalibrationProcess(cameraMatrix, distanceCoefficients, img);
                	loadCameraCalibration("CalibrationNation", cameraMatrix, distanceCoefficients);
                 std::cout << "load calibration completed" << endl;
-                startWebcamMonitoring(cameraMatrix, distanceCoefficients, arucoSquareDimension);
+                startWebcamMonitoring(cameraMatrix, distanceCoefficients, arucoSquareDimension, img);
                 std::cout << "webcam monitoring" << endl;
 	           // ROS_INFO("Calibration command done - exectued  ===================================");
                 img_received_ = false;
