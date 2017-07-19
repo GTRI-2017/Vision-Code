@@ -11,9 +11,10 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
 cv_bridge
-
+message_generation
 std_msgs
 image_transport
+aruco
 )
 
 ## System dependencies are found with CMake's conventions
@@ -121,6 +122,7 @@ catkin_package(
 include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
+  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
 )
 
 ## Declare a C++ library
@@ -204,8 +206,15 @@ include_directories(
 add_executable(detect src/detect.cpp)
 target_link_libraries(detect ${catkin_LIBRARIES})
 
+#add_executable(mrun4 src/mrun4.cpp)
+#target_link_libraries(mrun4 ${catkin_LIBRARIES})
+
+
 add_executable(detect2 src/detect2.cpp)
 target_link_libraries(detect2 ${catkin_LIBRARIES})
+
+add_executable(detect3 src/detect3.cpp)
+target_link_libraries(detect3 ${catkin_LIBRARIES})
 
 add_executable(aruco_create src/aruco_create.cpp)
 target_link_libraries(aruco_create ${catkin_LIBRARIES})
@@ -224,6 +233,7 @@ target_link_libraries(templatetest ${catkin_LIBRARIES})
 
 add_executable(fly_search src/fly_search.cpp)
 target_link_libraries(fly_search ${catkin_LIBRARIES})
+
 
 #add_executable(t1 src/t1.cpp)
 #target_link_libraries(t1 ${catkin_LIBRARIES})
