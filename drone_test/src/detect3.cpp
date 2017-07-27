@@ -1,3 +1,10 @@
+/*
+	This file was used to test how to subscribe to the camera feed from the drone.
+	NOTE: Not the actual detection process
+	
+
+*/ 
+
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
