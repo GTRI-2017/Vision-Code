@@ -1,9 +1,14 @@
+/***************************************************************************
+		GTRI ATAS SUMMER INTERNSHIP 2017
+	             VISION PROCESSING CODE
+	            DEVELOPER: ALLEN AYALA
+*****************************************************************************/
+
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
 #include <std_msgs/String.h>
 #include <sensor_msgs/Image.h> //drone video feed
 #include <cv_bridge/cv_bridge.h>
-
 #include "opencv2/highgui.hpp"
 #include "opencv2/aruco.hpp"
 #include "opencv2/core.hpp"
@@ -12,21 +17,12 @@
 #include "opencv2/calib3d.hpp"
 #include <image_transport/image_transport.h>
 #include <aruco/marker.h>
-/*Camera Dimensions (x & y):
-    Drone1B: 144 x 174
 
-*/
- 
-
-
+  
 #include <sstream>
 #include <iostream>
 #include <fstream>
 //NOTE:: In source file, if function is not static, it's an instance function
-
-// header files
-
-
 using namespace std;
 using std::cout;
 using std::endl;
@@ -36,36 +32,40 @@ const float arucoSquareDimension = .132; //needs to be standard 0.032f
 const cv::Size chessboardDimensions = cv::Size(9,6);
 const int videoPort = 0;
 
-//center camera frame, changers between drones:
+//center camera frame, changes between drones
+//Camera Dimensions (x & y):
 // P1B: 144 x 174  P2B: 640 x 360
+
+//constants containing center camera coordinates of each drone's bottom camera
 const float x_P1B = 72;
 const float y_P1B = 87;
 const float x_P2B = 320;
 const float y_P2B = 180;
 
-
-
+//assigning constant used in code based on drone being tested
 const float x_center = x_P2B;
 const float y_center = y_P2B;
-const float error = 25;
+const float error = 25; 
+
+//constants that make sure marker centroid falls within boundary region
 const float x_ideal_minimum = x_center - error;
 const float x_ideal_maximum = x_center + error;
 const float y_ideal_lower = y_center + error;
 const float y_ideal_higher = y_center - error;
 
-//movements are in reference to the bottom camera 
+//movements are in reference to the bottom camera; tell where to move the marker
 bool move_right = false;
 bool move_left = false;
 bool move_up = false;
 bool move_down = false;
 bool tagDetected = false; 
-bool land = false;
+bool land = false; // tells whether or not the drone is ready to be landed
 
-
-
+// NOTE: corners (in calibration) refer to the intersection points of the checker board squares
 
 void createKnownBoardPosition(cv::Size boardSize, float squareEdgeLength, vector<cv::Point3f>& corners){
-
+//places 3D world coordinates of each corner into a vector
+// used for camera calibration 
     for(int i = 0; i < boardSize.height; i++){
 
         for(int j=0; j < boardSize.width; j++){
@@ -76,11 +76,12 @@ void createKnownBoardPosition(cv::Size boardSize, float squareEdgeLength, vector
 
 //                                              vector of vectors, passed by reference
 void getChesssboardCorners(vector<cv::Mat> images, vector<vector<cv::Point2f> >& allFoundCorners, bool showResults = false){
-
+//obtains the 3D world coordinate of each corner from camera
+// used for camera calibration 
     for(vector<cv::Mat>::iterator iter = images.begin(); iter != images.end(); iter++){
 
-        vector<cv::Point2f> pointBuf;
-        bool found = findChessboardCorners(*iter, chessboardDimensions, pointBuf, CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_NORMALIZE_IMAGE); //bitwise or operator
+        vector<cv::Point2f> pointBuf; //temporary vector
+        bool found = findChessboardCorners(*iter, chessboardDimensions, pointBuf, CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_NORMALIZE_IMAGE); //bitwise "or" operator
 
         if(found){
 
@@ -90,7 +91,7 @@ void getChesssboardCorners(vector<cv::Mat> images, vector<vector<cv::Point2f> >&
         if(showResults){ //draws corners onto image
 
             drawChessboardCorners(*iter, chessboardDimensions, pointBuf, found);
-            imshow("Looking for Corners", *iter);
+            imshow("Looking for Corners", *iter); //shows camera feed with drawn calibration points
             cv::waitKey(0);
         }
 
@@ -99,16 +100,16 @@ void getChesssboardCorners(vector<cv::Mat> images, vector<vector<cv::Point2f> >&
 }
 
 void compareToCenter(float x, float y ){
-
+// interprets 2D marker centroid coordinates (in reference to the camera frame) and compares it to the camera center
     if( (x >= x_ideal_minimum && x <= x_ideal_maximum) && (y <= y_ideal_lower && y >= y_ideal_higher)) {
         land = true;
         cout << " -------------------------In Center -----------------------" << endl;
     }else{
         land = false;
         }
-    //filters out error readings
+    
    if(x > 0 && y > 0 ){
-
+	//filters out error readings
             tagDetected = true;
             if(x < x_ideal_minimum){
                 move_right = true;
@@ -147,19 +148,15 @@ void compareToCenter(float x, float y ){
 }
 
 int startWebcamMonitoring(const cv::Mat& cameraMatrix, const cv::Mat& distanceCoefficients, float arucoSquareDimension, cv::Mat& frame){
-
-    
+	// ArUco detection and pose edtimation performed live on drone camera feed     
 
     vector<int> markerIds;
-
+	
     vector<vector<cv::Point2f> > markerCorners, rejectedCandidates;
     cv::aruco::DetectorParameters parameters;
 
     cv::Ptr<cv::aruco::Dictionary> markerDictionary =
             cv::aruco::getPredefinedDictionary(cv::aruco::PREDEFINED_DICTIONARY_NAME(0)); //0 = DICT_4x4_50
-
-
-
 
     cv::namedWindow("Webcam", CV_WINDOW_AUTOSIZE);
 
@@ -179,49 +176,27 @@ int startWebcamMonitoring(const cv::Mat& cameraMatrix, const cv::Mat& distanceCo
 
         cout << "-------------------Coordinates ---------------------------" << endl; 
         for(int i=0; i<markerCorners.size(); i++) // Ensure that you don't access any elements that don't exist
-            for(int p=0; p<markerCorners[i].size(); p++) {// You may not have had 10 in here before, only go to size().
-            cout << markerCorners[i][p] << " " ;
+            for(int p=0; p<markerCorners[i].size(); p++) {
+			//finds average of marker corner coordinates             
             x_sum  += markerCorners[i][p].x;
             y_sum  += markerCorners[i][p].y;
             }
             x_average = x_sum/4;
             y_average = y_sum/4;
+			
+			//NOTE: taking the average of the 2D coordinated of the corners results in the coordinates for the centroid
 
-            cout << "\n Mean X: " << x_average << " Mean Y: " << y_average << endl;
-            compareToCenter(x_average, y_average);
-        
-     /*   cv::Mat mean_;
-        cv::reduce(markerCorners, mean_, 01, CV_REDUCE_AVG);
-        cv::Point2f mean(mean_.at<float>(0,0), mean_.at<float>(0,1));
-        cout << "Mean Value" << mean << endl;         */   
-
-  
+            cout << "\n Mean X: " << x_average << " Mean Y: " << y_average << endl; //prints out 2D coordinate of ArUco marker centroid 
+            compareToCenter(x_average, y_average); //performs comparison with marker centroid
+               
         for(int i = 0;  i < markerIds.size(); i ++){
 
             cv::aruco::drawAxis(frame, cameraMatrix, distanceCoefficients, rotationVectors[i], translationVectors[i], 0.1f);
-          //  ROS_INFO("---------------------Loop: %i", i);
-           // std::cout << "Translation Vectors: " << translationVectors[i] << std::endl;
-            //   std::cout << "Translation Vectors: %i" << translationVectors[i] << std::endl;
-         //  std::cout << "Rotation vectors: " <<  rotationVectors[i] << std::endl;
-        // std::cout << "Corners: " <<  markerCorners[i]  [i] << std::endl;
-        }
-        //print vectors contents
-        /*for( vector<vector<vector<cv::Point2f> > >::const_iterator i = markerCorners.begin(); i != markerCorners.end(); ++i)
-{
-   for( vector<vector<cv::Point2f> >::const_iterator j = i->begin(); j != i->end(); ++j)
-   {
-        for( <vector<cv::Point2f>::const_iterator k = j->begin(); k != j->end(); ++k)
-        { 
-                 cout<<*k<<' ';
-        }
-   }
-} */
 
-      
+        }
 
         imshow("Webcam",  frame);
         if (cv::waitKey(30) >= 0) break; //if nothing is detected within 30 seconds, program stops
-
     }
     return 1;
 }
@@ -229,17 +204,16 @@ int startWebcamMonitoring(const cv::Mat& cameraMatrix, const cv::Mat& distanceCo
 
 
 void cameraCalibration(vector<cv::Mat> calibrationImages, cv::Size boardSize, float squareEdgeLength, cv::Mat& cameraMatrix, cv::Mat& distanceCoefficients){
-
-    vector<vector<cv::Point2f> > checkerboardImageSpacePoints;
+	// performs calibration algorithms on saved images
+	vector<vector<cv::Point2f> > checkerboardImageSpacePoints;
     getChesssboardCorners(calibrationImages, checkerboardImageSpacePoints, false);
 
     vector<vector<cv::Point3f> > worldSpaceCornerPoints(1);
 
     createKnownBoardPosition(boardSize, squareEdgeLength, worldSpaceCornerPoints[0]);
     worldSpaceCornerPoints.resize(checkerboardImageSpacePoints.size(), worldSpaceCornerPoints[0]);
-    //  ↑↑↑ resizes and fills vector with  each wSCP points
 
-    vector<cv::Mat> rVectors, tVectors; //radial and tangential vectors
+    vector<cv::Mat> rVectors, tVectors; //rotation and translation vectors
     distanceCoefficients = cv::Mat::zeros(8,1, CV_64F);
 
     calibrateCamera(worldSpaceCornerPoints, checkerboardImageSpacePoints, boardSize, cameraMatrix,
@@ -256,8 +230,8 @@ bool saveCameraCalibration(string name, cv::Mat cameraMatrix, cv::Mat distanceCo
 
         uint16_t rows = cameraMatrix.rows;
         uint16_t columns = cameraMatrix.cols;
-
-        outStream << rows << endl; //saves data into the file
+		//saves data into the file
+        outStream << rows << endl; 
         outStream << columns << endl;
 
         for(int r =0; r < rows; r++){
@@ -271,8 +245,8 @@ bool saveCameraCalibration(string name, cv::Mat cameraMatrix, cv::Mat distanceCo
 
         rows = distanceCoefficients.rows;
         columns = distanceCoefficients.cols;
-
-        outStream << rows << endl; //saves data into the file
+		//saves data into the file
+        outStream << rows << endl; 
         outStream << columns << endl;
 
         for(int r =0; r < rows; r++){
@@ -292,19 +266,19 @@ bool saveCameraCalibration(string name, cv::Mat cameraMatrix, cv::Mat distanceCo
 }
 
 bool loadCameraCalibration(string name, cv::Mat& cameraMatrix, cv::Mat& distanceCoefficients){
-
+	//loads proper calibration paramters for specific camera
     ifstream inStream(name.c_str()); //for C++03
     if (inStream){
 
         uint64_t rows, columns;
-
-        inStream >> rows; //reads values from the file
+		//reads values from the file
+        inStream >> rows; 
         inStream >> columns;
 
         cameraMatrix = cv::Mat(cv::Size(columns, rows), CV_64F);
 
-      //  std::cout << "cameraMatrix values" << endl;
-        //iterate over cameraMatrix values
+ 
+        //iterate and reads over cameraMatrix values
         for(int r = 0; r < rows; r++){
 
             for(int c= 0; c <columns; c++){
@@ -316,9 +290,7 @@ bool loadCameraCalibration(string name, cv::Mat& cameraMatrix, cv::Mat& distance
                // cout << cameraMatrix.at<double>(r,c) << "\n";
             }
         }
-        //std::cout << "For loop completed - CAMERA MAT" << endl;
-
-        //grab all the distanceCoefficients
+       //grab all the distanceCoefficients
 
         inStream >> rows;
         inStream >> columns;
@@ -333,21 +305,12 @@ bool loadCameraCalibration(string name, cv::Mat& cameraMatrix, cv::Mat& distance
 
             for(int c= 0; c < columns; c++){
 
-              //  cout << "Current Col(1) :" << c << endl;
-              //  cout << "Current Row(1) :" << r << endl;
+       
                 double read = 0.0f;
                 inStream >> read;
-            //    cout << "read done" << endl;
                 distanceCoefficients.at<double>(r,c) = read;
-           //     cout << "finding coefficients done " << endl;
-            //    cout << distanceCoefficients.at<double>(r,c) << "\n";
-
-                 }
-
+				}
            }
-
-      //  std::cout << "For loop completed - DISTANCE COEFFICIENTS" << endl;
-
         inStream.close();
         return true;
         }
@@ -357,50 +320,41 @@ bool loadCameraCalibration(string name, cv::Mat& cameraMatrix, cv::Mat& distance
 
  vector<cv::Mat> savedImages;
 
-void cameraCalibrationProcess(cv::Mat& cameraMatrix, cv::Mat& distanceCoefficients, cv::Mat& frame){ //new
-   // ROS_INFO("-------------------------cameraCalibrationProcess");
+void cameraCalibrationProcess(cv::Mat& cameraMatrix, cv::Mat& distanceCoefficients, cv::Mat& frame){ 
+//gets calibration images from live camera feed   
     cv::Mat drawToFrame;
 
-		
-   
     vector<vector<cv::Point2f> > markerCorners, rejectedCandidates;
 
     int framesPerSecond = 20;
 
-    cv::namedWindow("Webcam", CV_WINDOW_AUTOSIZE);
-  //  ROS_INFO("Window Drawn");
+    cv::namedWindow("Webcam", CV_WINDOW_AUTOSIZE); // draws an OpencCv window 
 
-  //  while(true){
-	
-  	//		ROS_INFO("While loop entered - CCP");
         vector<cv::Vec2f> foundPoints;
         bool found = false; 
-			//	ROS_INFO("start to find chessboard");
+			
         if (frame.empty()){
         ROS_INFO("MATRIX IS EMPTY!");
         }else{
             found = findChessboardCorners(frame, chessboardDimensions, foundPoints, CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_NORMALIZE_IMAGE);
-                // ROS_INFO("found = %i", found);
+                
         }
-
-        //ROS_INFO("chessboard found");
-        frame.copyTo(drawToFrame);
-      //  ROS_INFO("Frame Copied");
         
+        frame.copyTo(drawToFrame);
+       
         drawChessboardCorners(drawToFrame, chessboardDimensions, foundPoints, found);
-     //   ROS_INFO("DRAW called");
+     
         if(found){
-            //ROS_INFO("IF statement");
+            
             imshow("Webcam", drawToFrame);
     }else{
-           // ROS_INFO("Else statment");
-           // ROS_INFO("FRAME IS EMPTY %i", frame.empty());
-            imshow("Webcam", frame);  //ERROR bc frame is empty
+           
+            imshow("Webcam", frame);  
     }
         char character = cv::waitKey(1000 / framesPerSecond); //capture typed chars
-       // ROS_INFO("BEFOR SWTICH STATEMENT");
+
         switch(character){
-        
+		//checks input for saving images, performing calibration algorithm, or exiting the calibration        
         case ' ':
             //SPACE - saving image
             ROS_INFO("SPACBAR ----------------------------------------SPACEBAR----");
@@ -425,14 +379,12 @@ void cameraCalibrationProcess(cv::Mat& cameraMatrix, cv::Mat& distanceCoefficien
             break;
         case 27:
             //ESCAPE - exit
-
-            std::cout << "calibration finished" << endl;
+			std::cout << "calibration finished" << endl;
             return; // 0;
             break;
 
         }
-    //}
-}
+ }
   
  bool img_received_ = false;  //image processing
  bool video_received_ = false; //video feed
@@ -488,20 +440,19 @@ public:
     cv_bridge::CvImagePtr cv_ptr;
     try
     {
-        //cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
         img = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::BGR8)->image;
        
-       // cout << "image sent" << endl;
         img_received_ = true;
         video_received_ = true;
-       // cout << "image is true" << endl;
+       
         int rows = img.rows;
         int cols = img.cols;
-       // ROS_INFO("A");
+       
         cv::Size s = img.size();
         rows = s.height;//240 for P1 and 360 P2
         cols = s.width;//320 for P1 and 640 for P2
-      //  ROS_INFO("Mat Input Rows: %i", rows );  
+      //displays dimensions of camera frame
+	  //  ROS_INFO("Mat Input Rows: %i", rows );  
        // ROS_INFO("Mat Input Cols: %i", cols );
       
     }
@@ -511,24 +462,22 @@ public:
       return;
     }
 
-    // Draw an example circle on the video stream
-    //if (img.rows > 60 && img.cols > 60)
+
      
    // Update GUI Window
-   
-    if (video_received_){ //Error: not being executed repeatedly
-        //cv::circle(img, cv::Point(100, 100), 100, CV_RGB(255,0,0));
+    if (video_received_){ 
+        
         cv::imshow(OPENCV_WINDOW, img);
-       // ROS_INFO("imshow called ---------------------------------------- imshow CALLED");
         cv::waitKey(3); //allows for compt to process
         video_received_ = false;
-    }
-    
+		}
     }
 
     void detectMovement(){
-        //function that determines how the drone moves; executed when the tag is detected 
-          if(move_right){
+        //function that publishes to topic how the drone should move when tag seen; executed only when the tag is detected 
+		//values are opposite than expected becuase drone must move in opposite vector in order to move the marker correctly
+        // e.g.  marker is to the left of center (move_right = TRUE), drone must move left
+		  if(move_right){
             
             pos_msg.linear.x = -0.1;
             cout << "-------------   +X   ----------" << endl;
@@ -556,7 +505,7 @@ public:
 
 
     void send_movement(){
-
+	//publishes proper movement vectors to topic 
         if(land){
             
             pos_msg.angular.x = 1;
@@ -582,47 +531,34 @@ public:
        pub_pos.publish(pos_msg);
     }
   
-     // Output modified video stream
-    //image_pub_.publish(cv_ptr->toImageMsg());
-  void run2(){
-
+       void run2(){
+		//main code runtime procedure
   	   ros::Rate loop_rate(10); // 10 Hz
 
         while (ros::ok()) { //how code shiuld be structured
   	        //main code
             
-          //  ROS_INFO("run2 called ");
+          
 	        cv::Mat cameraMatrix = cv::Mat::eye(3,3, CV_64F); //identity matrix
-   			//ROS_INFO("Mat 1 done");
+   			
    			cv::Mat distanceCoefficients;
-   		//	ROS_INFO("Mat 2 done");
-   		//	ROS_INFO("---------------------------------img receieved ============= %i", img_received_ );
+   		
    			if(img_received_){  	  
-                 //  ROS_INFO("IF LOOP ENTED IN RUN2");
+            
 		//	 cameraCalibrationProcess(cameraMatrix, distanceCoefficients, img);
-            	loadCameraCalibration("Drone2B", cameraMatrix, distanceCoefficients);
-             //  std::cout << "load calibration completed" << endl;
+            	loadCameraCalibration("Drone2B", cameraMatrix, distanceCoefficients); // filename needs to be changed based on drone used 
                 startWebcamMonitoring(cameraMatrix, distanceCoefficients, arucoSquareDimension, img);
-              //  std::cout << "webcam monitoring" << endl;
-	           // ROS_INFO("Calibration command done - exectued  ===================================");
-                
-                send_movement();
+                send_movement(); //performs function to publish to topic
                 
                }
             ros::spinOnce();
             loop_rate.sleep();
     	}
 }    
-  /*  
-   */
+    
+  
   
 };
-
-
-
-  
-
-//bool ImageConverter::img_received_ = false;
 
 
 int main(int argc, char** argv)
@@ -631,10 +567,5 @@ int main(int argc, char** argv)
   ros::init(argc, argv, "detect");
   ImageConverter ic;
   ic.run2();
-  //run();
-  
-  
   return 0;
 }
-
-
