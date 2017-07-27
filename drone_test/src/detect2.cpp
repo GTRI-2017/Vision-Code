@@ -1,3 +1,6 @@
+/*
+	This file was to test code that was able to receive the drone camera's feed as a cv::Mat type. 
+*/
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
