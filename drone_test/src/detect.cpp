@@ -4,6 +4,11 @@
 	            DEVELOPER: ALLEN AYALA
 *****************************************************************************/
 
+/*
+	NOTE: For code to work accurately, camera must be calibrated once, unless it changes focus.
+	Although a minimum of 15 pictures are used for calibration, more is better (around 50)
+*/
+
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
 #include <std_msgs/String.h>
@@ -545,6 +550,10 @@ public:
    		
    			if(img_received_){  	  
             
+		/*
+		To calibrate the camera, uncomment the line directly below this comment. Comment out the following 3 lines.
+		Once camera has been calibrated, run the code as currently seen
+		*/
 		//	 cameraCalibrationProcess(cameraMatrix, distanceCoefficients, img);
             	loadCameraCalibration("Drone2B", cameraMatrix, distanceCoefficients); // filename needs to be changed based on drone used 
                 startWebcamMonitoring(cameraMatrix, distanceCoefficients, arucoSquareDimension, img);
